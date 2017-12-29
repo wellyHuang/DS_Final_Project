@@ -3,9 +3,14 @@ from sklearn.preprocessing import StandardScaler
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
-import sys
+import sys, time
 from sklearn.decomposition import PCA
 from sklearn.manifold import Isomap
+from keras.models import Sequential
+from keras.layers.convolutional import Conv2D, MaxPooling2D
+from keras.layers import Activation, Flatten, Dense, Dropout
+from keras.utils import np_utils
+from keras import callbacks
 
 #Regression part
 def regression(X_train, X_test, y_train, y_test, test_data):
@@ -27,14 +32,18 @@ def decision_tree(X_train, X_test, y_train, y_test, test_data):
 	dct = tree.DecisionTreeClassifier(criterion='gini',
 		splitter= 'best',
 		max_depth=None,
-		min_samples_split=3,
-		max_features=None,
-		max_leaf_nodes=None,
+		min_samples_split=2000,
+		max_features=5,
+		max_leaf_nodes=20,
 		min_impurity_decrease=0.0)
 	dct.fit(X_train, y_train)
 
 	print(dct.score(X_test, y_test))
 	print(dct.score(X_train, y_train))
+
+	#output the dot file to visualized the tree
+	tree.export_graphviz(dct, out_file="tree.dot")
+
 
 	prediction = dct.predict(test_data)
 	return prediction
@@ -82,6 +91,34 @@ def neural_nwk(X_train, X_test, y_train, y_test, test_data):
 	prediction = mlp.predict(test_data)
 	return prediction
 
+def dnn(X_train, X_test, y_train, y_test, test_data):
+    # To categorical
+    num_classes = 5
+    y_train = np_utils.to_categorical(y_train, num_classes)
+    y_test = np_utils.to_categorical(y_test, num_classes)
+    # Define the model
+    model = Sequential()
+    model.add(Dense(1024, input_shape=(122,), activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(128, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    # Compile the model
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    cb = callbacks.EarlyStopping(monitor='val_acc', min_delta=0, patience=4, verbose=0, mode='auto')
+    
+	# Fit
+    start = time.time()
+    model.fit(X_train, y_train, batch_size=128, nb_epoch=5, shuffle=True, verbose=1, validation_split=0.1, callbacks=[cb])
+    end = time.time()
+    loss, accuracy = model.evaluate(X_train,y_train)
+    print(accuracy)
+    loss, accuracy = model.evaluate(X_test,y_test)
+    print(accuracy)
+
+    prediction = model.predict(test_data)
+    return 0
+
 #determine which method to call
 def call_method_type_from_cmd(type,X_train, X_test, y_train, y_test, td):
 	if   type == 'R':
@@ -92,6 +129,8 @@ def call_method_type_from_cmd(type,X_train, X_test, y_train, y_test, td):
 		method = svm_(X_train, X_test, y_train, y_test, td)
 	elif type == 'N':
 		method = neural_nwk(X_train, X_test, y_train, y_test, td)
+	elif type == 'DNN':
+		method = dnn(X_train, X_test, y_train, y_test, td)
 	else:
 		method = None
 		print("wrong argument!")
